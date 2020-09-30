@@ -55,13 +55,18 @@ type Client struct {
 	// To log to standard out, use:
 	//  client.Log = func(s string) { log.Println(s) }
 	Log func(s string)
+
+	StartHook     func(ctx context.Context)
+	CompletedHook func(ctx context.Context)
 }
 
 // NewClient makes a new Client capable of making GraphQL requests.
 func NewClient(endpoint string, opts ...ClientOption) *Client {
 	c := &Client{
-		endpoint: endpoint,
-		Log:      func(string) {},
+		endpoint:      endpoint,
+		Log:           func(string) {},
+		StartHook:     func(context.Context) {},
+		CompletedHook: func(context.Context) {},
 	}
 	for _, optionFunc := range opts {
 		optionFunc(c)
@@ -97,6 +102,8 @@ func (c *Client) Run(ctx context.Context, req *Request, resp interface{}) error 
 }
 
 func (c *Client) runWithJSON(ctx context.Context, req *Request, resp interface{}) error {
+	c.StartHook(ctx)
+	defer c.CompletedHook(ctx)
 	var requestBody bytes.Buffer
 	requestBodyObj := struct {
 		Query     string                 `json:"query"`
@@ -151,6 +158,8 @@ func (c *Client) runWithJSON(ctx context.Context, req *Request, resp interface{}
 }
 
 func (c *Client) runWithPostFields(ctx context.Context, req *Request, resp interface{}) error {
+	c.StartHook(ctx)
+	defer c.CompletedHook(ctx)
 	var requestBody bytes.Buffer
 	writer := multipart.NewWriter(&requestBody)
 	if err := writer.WriteField("query", req.q); err != nil {
