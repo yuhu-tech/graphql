@@ -56,8 +56,8 @@ type Client struct {
 	//  client.Log = func(s string) { log.Println(s) }
 	Log func(s string)
 
-	StartHook     func(ctx context.Context)
-	CompletedHook func(ctx context.Context)
+	StartHook     func(ctx context.Context, requestBody string)
+	CompletedHook func(ctx context.Context, responseData string)
 }
 
 // NewClient makes a new Client capable of making GraphQL requests.
@@ -65,8 +65,8 @@ func NewClient(endpoint string, opts ...ClientOption) *Client {
 	c := &Client{
 		endpoint:      endpoint,
 		Log:           func(string) {},
-		StartHook:     func(context.Context) {},
-		CompletedHook: func(context.Context) {},
+		StartHook:     func(context.Context, string) {},
+		CompletedHook: func(context.Context, string) {},
 	}
 	for _, optionFunc := range opts {
 		optionFunc(c)
@@ -102,8 +102,6 @@ func (c *Client) Run(ctx context.Context, req *Request, resp interface{}) error 
 }
 
 func (c *Client) runWithJSON(ctx context.Context, req *Request, resp interface{}) error {
-	c.StartHook(ctx)
-	defer c.CompletedHook(ctx)
 	var requestBody bytes.Buffer
 	requestBodyObj := struct {
 		Query     string                 `json:"query"`
@@ -115,6 +113,7 @@ func (c *Client) runWithJSON(ctx context.Context, req *Request, resp interface{}
 	if err := json.NewEncoder(&requestBody).Encode(requestBodyObj); err != nil {
 		return errors.Wrap(err, "encode body")
 	}
+	c.StartHook(ctx, requestBody.String())
 	c.logf(">> variables: %v", req.vars)
 	c.logf(">> query: %s", req.q)
 	gr := &graphResponse{
@@ -144,6 +143,7 @@ func (c *Client) runWithJSON(ctx context.Context, req *Request, resp interface{}
 		return errors.Wrap(err, "reading body")
 	}
 	c.logf("<< %s", buf.String())
+	defer c.CompletedHook(ctx, buf.String())
 	if err := json.NewDecoder(&buf).Decode(&gr); err != nil {
 		if res.StatusCode != http.StatusOK {
 			return fmt.Errorf("graphql: server returned a non-200 status code: %v", res.StatusCode)
@@ -158,8 +158,6 @@ func (c *Client) runWithJSON(ctx context.Context, req *Request, resp interface{}
 }
 
 func (c *Client) runWithPostFields(ctx context.Context, req *Request, resp interface{}) error {
-	c.StartHook(ctx)
-	defer c.CompletedHook(ctx)
 	var requestBody bytes.Buffer
 	writer := multipart.NewWriter(&requestBody)
 	if err := writer.WriteField("query", req.q); err != nil {
@@ -187,6 +185,7 @@ func (c *Client) runWithPostFields(ctx context.Context, req *Request, resp inter
 	if err := writer.Close(); err != nil {
 		return errors.Wrap(err, "close writer")
 	}
+	c.StartHook(ctx, requestBody.String())
 	c.logf(">> variables: %s", variablesBuf.String())
 	c.logf(">> files: %d", len(req.files))
 	c.logf(">> query: %s", req.q)
@@ -217,6 +216,7 @@ func (c *Client) runWithPostFields(ctx context.Context, req *Request, resp inter
 		return errors.Wrap(err, "reading body")
 	}
 	c.logf("<< %s", buf.String())
+	defer c.CompletedHook(ctx, buf.String())
 	if err := json.NewDecoder(&buf).Decode(&gr); err != nil {
 		if res.StatusCode != http.StatusOK {
 			return fmt.Errorf("graphql: server returned a non-200 status code: %v", res.StatusCode)
