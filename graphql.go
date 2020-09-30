@@ -38,6 +38,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -56,7 +57,7 @@ type Client struct {
 	//  client.Log = func(s string) { log.Println(s) }
 	Log func(s string)
 
-	StartHook     func(ctx context.Context, requestBody string)
+	StartHook     func(ctx context.Context, requestBody, method string)
 	CompletedHook func(ctx context.Context, responseData string)
 }
 
@@ -65,7 +66,7 @@ func NewClient(endpoint string, opts ...ClientOption) *Client {
 	c := &Client{
 		endpoint:      endpoint,
 		Log:           func(string) {},
-		StartHook:     func(context.Context, string) {},
+		StartHook:     func(context.Context, string, string) {},
 		CompletedHook: func(context.Context, string) {},
 	}
 	for _, optionFunc := range opts {
@@ -113,7 +114,8 @@ func (c *Client) runWithJSON(ctx context.Context, req *Request, resp interface{}
 	if err := json.NewEncoder(&requestBody).Encode(requestBodyObj); err != nil {
 		return errors.Wrap(err, "encode body")
 	}
-	c.StartHook(ctx, requestBody.String())
+	method := strings.Split(req.q, " ")[0]
+	c.StartHook(ctx, requestBody.String(), method)
 	c.logf(">> variables: %v", req.vars)
 	c.logf(">> query: %s", req.q)
 	gr := &graphResponse{
@@ -185,7 +187,8 @@ func (c *Client) runWithPostFields(ctx context.Context, req *Request, resp inter
 	if err := writer.Close(); err != nil {
 		return errors.Wrap(err, "close writer")
 	}
-	c.StartHook(ctx, requestBody.String())
+	method := strings.Split(req.q, " ")[0]
+	c.StartHook(ctx, requestBody.String(), method)
 	c.logf(">> variables: %s", variablesBuf.String())
 	c.logf(">> files: %d", len(req.files))
 	c.logf(">> query: %s", req.q)
