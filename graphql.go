@@ -58,7 +58,7 @@ type Client struct {
 	Log func(s string)
 
 	StartHook     func(ctx context.Context, requestBody, method string) context.Context
-	CompletedHook func(ctx context.Context, responseData string) context.Context
+	CompletedHook func(ctx context.Context, responseData string)
 }
 
 // NewClient makes a new Client capable of making GraphQL requests.
@@ -67,7 +67,7 @@ func NewClient(endpoint string, opts ...ClientOption) *Client {
 		endpoint:      endpoint,
 		Log:           func(string) {},
 		StartHook:     func(ctx context.Context, requestBody, method string) context.Context { return ctx },
-		CompletedHook: func(ctx context.Context, responseData string) context.Context { return ctx },
+		CompletedHook: func(ctx context.Context, responseData string) {},
 	}
 	for _, optionFunc := range opts {
 		optionFunc(c)
@@ -145,7 +145,7 @@ func (c *Client) runWithJSON(ctx context.Context, req *Request, resp interface{}
 		return errors.Wrap(err, "reading body")
 	}
 	c.logf("<< %s", buf.String())
-	defer func() { ctx = c.CompletedHook(ctx, buf.String()) }()
+	defer c.CompletedHook(ctx, buf.String())
 	if err := json.NewDecoder(&buf).Decode(&gr); err != nil {
 		if res.StatusCode != http.StatusOK {
 			return fmt.Errorf("graphql: server returned a non-200 status code: %v", res.StatusCode)
@@ -219,7 +219,7 @@ func (c *Client) runWithPostFields(ctx context.Context, req *Request, resp inter
 		return errors.Wrap(err, "reading body")
 	}
 	c.logf("<< %s", buf.String())
-	defer func() { ctx = c.CompletedHook(ctx, buf.String()) }()
+	defer c.CompletedHook(ctx, buf.String())
 	if err := json.NewDecoder(&buf).Decode(&gr); err != nil {
 		if res.StatusCode != http.StatusOK {
 			return fmt.Errorf("graphql: server returned a non-200 status code: %v", res.StatusCode)
