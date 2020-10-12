@@ -114,7 +114,20 @@ func (c *Client) runWithJSON(ctx context.Context, req *Request, resp interface{}
 	if err := json.NewEncoder(&requestBody).Encode(requestBodyObj); err != nil {
 		return errors.Wrap(err, "encode body")
 	}
-	method := strings.Split(req.q, " ")[0]
+	method := "query"
+	if len(strings.TrimSpace(req.q)) > 0 {
+		methodFirstLetter := strings.ToLower(strings.TrimSpace(req.q)[0:1])
+		switch methodFirstLetter {
+		case "q":
+			method = "query"
+		case "m":
+			method = "mutation"
+		case "s":
+			method = "subscription"
+		default:
+			method = "query"
+		}
+	}
 	ctx = c.StartHook(ctx, requestBody.String(), method)
 	c.logf(">> variables: %v", req.vars)
 	c.logf(">> query: %s", req.q)
