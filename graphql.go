@@ -58,7 +58,7 @@ type Client struct {
 	Log func(s string)
 
 	StartHook     func(ctx context.Context, requestBody, method string) context.Context
-	CompletedHook func(ctx context.Context, responseData string)
+	CompletedHook func(ctx context.Context, responseData string, isErr bool)
 }
 
 // NewClient makes a new Client capable of making GraphQL requests.
@@ -67,7 +67,7 @@ func NewClient(endpoint string, opts ...ClientOption) *Client {
 		endpoint:      endpoint,
 		Log:           func(string) {},
 		StartHook:     func(ctx context.Context, requestBody, method string) context.Context { return ctx },
-		CompletedHook: func(ctx context.Context, responseData string) {},
+		CompletedHook: func(ctx context.Context, responseData string, isErr bool) {},
 	}
 	for _, optionFunc := range opts {
 		optionFunc(c)
@@ -136,6 +136,7 @@ func (c *Client) runWithJSON(ctx context.Context, req *Request, resp interface{}
 	}
 	r, err := http.NewRequest(http.MethodPost, c.endpoint, &requestBody)
 	if err != nil {
+		c.CompletedHook(ctx, "new request error", true)
 		return err
 	}
 	r.Close = c.closeReq
@@ -150,21 +151,25 @@ func (c *Client) runWithJSON(ctx context.Context, req *Request, resp interface{}
 	r = r.WithContext(ctx)
 	res, err := c.httpClient.Do(r)
 	if err != nil {
+		c.CompletedHook(ctx, "http client request error", true)
 		return err
 	}
 	defer res.Body.Close()
 	var buf bytes.Buffer
 	if _, err := io.Copy(&buf, res.Body); err != nil {
+		c.CompletedHook(ctx, "reading body error", true)
 		return errors.Wrap(err, "reading body")
 	}
 	c.logf("<< %s", buf.String())
-	defer c.CompletedHook(ctx, buf.String())
 	if err := json.NewDecoder(&buf).Decode(&gr); err != nil {
 		if res.StatusCode != http.StatusOK {
+			c.CompletedHook(ctx, buf.String(), true)
 			return fmt.Errorf("graphql: server returned a non-200 status code: %v", res.StatusCode)
 		}
+		c.CompletedHook(ctx, buf.String(), true)
 		return errors.Wrap(err, "decoding response")
 	}
+	c.CompletedHook(ctx, buf.String(), len(gr.Errors) > 0)
 	if len(gr.Errors) > 0 {
 		// return first error
 		return gr.Errors[0]
@@ -210,6 +215,7 @@ func (c *Client) runWithPostFields(ctx context.Context, req *Request, resp inter
 	}
 	r, err := http.NewRequest(http.MethodPost, c.endpoint, &requestBody)
 	if err != nil {
+		c.CompletedHook(ctx, "new request error", true)
 		return err
 	}
 	r.Close = c.closeReq
@@ -224,21 +230,25 @@ func (c *Client) runWithPostFields(ctx context.Context, req *Request, resp inter
 	r = r.WithContext(ctx)
 	res, err := c.httpClient.Do(r)
 	if err != nil {
+		c.CompletedHook(ctx, "http client request error", true)
 		return err
 	}
 	defer res.Body.Close()
 	var buf bytes.Buffer
 	if _, err := io.Copy(&buf, res.Body); err != nil {
+		c.CompletedHook(ctx, "reading body error", true)
 		return errors.Wrap(err, "reading body")
 	}
 	c.logf("<< %s", buf.String())
-	defer c.CompletedHook(ctx, buf.String())
 	if err := json.NewDecoder(&buf).Decode(&gr); err != nil {
 		if res.StatusCode != http.StatusOK {
+			c.CompletedHook(ctx, buf.String(), true)
 			return fmt.Errorf("graphql: server returned a non-200 status code: %v", res.StatusCode)
 		}
+		c.CompletedHook(ctx, buf.String(), true)
 		return errors.Wrap(err, "decoding response")
 	}
+	c.CompletedHook(ctx, buf.String(), len(gr.Errors) > 0)
 	if len(gr.Errors) > 0 {
 		// return first error
 		return gr.Errors[0]
