@@ -160,16 +160,17 @@ func (c *Client) runWithJSON(ctx context.Context, req *Request, resp interface{}
 		c.CompletedHook(ctx, "reading body error", true)
 		return errors.Wrap(err, "reading body")
 	}
-	c.logf("<< %s", buf.String())
+	resBodyStr := buf.String()
+	c.logf("<< %s", resBodyStr)
 	if err := json.NewDecoder(&buf).Decode(&gr); err != nil {
 		if res.StatusCode != http.StatusOK {
-			c.CompletedHook(ctx, buf.String(), true)
+			c.CompletedHook(ctx, resBodyStr, true)
 			return fmt.Errorf("graphql: server returned a non-200 status code: %v", res.StatusCode)
 		}
-		c.CompletedHook(ctx, buf.String(), true)
+		c.CompletedHook(ctx, resBodyStr, true)
 		return errors.Wrap(err, "decoding response")
 	}
-	c.CompletedHook(ctx, buf.String(), len(gr.Errors) > 0)
+	c.CompletedHook(ctx, resBodyStr, len(gr.Errors) > 0)
 	if len(gr.Errors) > 0 {
 		// return first error
 		return gr.Errors[0]
@@ -239,16 +240,17 @@ func (c *Client) runWithPostFields(ctx context.Context, req *Request, resp inter
 		c.CompletedHook(ctx, "reading body error", true)
 		return errors.Wrap(err, "reading body")
 	}
-	c.logf("<< %s", buf.String())
+	resBodyStr := buf.String()
+	c.logf("<< %s", resBodyStr)
 	if err := json.NewDecoder(&buf).Decode(&gr); err != nil {
 		if res.StatusCode != http.StatusOK {
-			c.CompletedHook(ctx, buf.String(), true)
+			c.CompletedHook(ctx, resBodyStr, true)
 			return fmt.Errorf("graphql: server returned a non-200 status code: %v", res.StatusCode)
 		}
-		c.CompletedHook(ctx, buf.String(), true)
+		c.CompletedHook(ctx, resBodyStr, true)
 		return errors.Wrap(err, "decoding response")
 	}
-	c.CompletedHook(ctx, buf.String(), len(gr.Errors) > 0)
+	c.CompletedHook(ctx, resBodyStr, len(gr.Errors) > 0)
 	if len(gr.Errors) > 0 {
 		// return first error
 		return gr.Errors[0]
